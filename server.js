@@ -4,9 +4,28 @@ var mongoose = require('mongoose');
 var Post = require('./models/Post');
 var User = require('./models/User');
 var q = require('q');
+var multer = require('multer');
+var fs = require('fs');
+var AWS = require('aws-sdk');
+var mime = require('mime');
+
+//since we use these vars multiple times, store them here
+var aws_region = 'us-west-1';
+var aws_bucket_name = 'posts-notifs';
+
+AWS.config.update({
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_KEY,
+    region: aws_region
+});
+
+console.log(process.env.AWS_ACCESS_KEY)
+console.log(process.env.AWS_SECRET_KEY)
 
 var app = express();
+app.use(express.static(__dirname+'/public'));
 app.use(bodyParser.json());
+app.use(multer({dest: './uploads/'}))
 
 mongoose.connect('mongodb://localhost/post-notifs');
 
@@ -112,6 +131,48 @@ app.post('/users', function(req, res) {
 	user.save(function(err, newUser) {
 		return res.json(newUser);
 	});
+});
+
+app.get('/users/:id', function(req, res) {
+	User.findOne({_id: req.params.id}).exec().then(function(user) {
+		//make file path convenient for client (they don't have to know wich CDN we're using)
+		user.profile_picture = 'https://s3-'+aws_region+'.amazonaws.com/'+aws_bucket_name+'/'+user.profile_picture;
+		return res.json(user);
+	});
+});
+
+app.post('/users/:id/photo', function(req, res) {
+	var photo = req.files.photo;
+	//if you want to upload to S3
+	var s3bucket = new AWS.S3();
+	var amazon_filename = req.params.id+'.'+photo.extension;
+	fs.readFile(photo.path, function(err, file_buffer){
+	    var params = {
+	        Bucket: aws_bucket_name,
+	        Key: amazon_filename,
+	        Body: file_buffer,
+    		ACL: 'public-read', //this makes it public by default
+	        ContentType: mime.lookup(photo.path)
+	    };
+	    s3bucket.putObject(params, function (perr, pres) {
+	    	//once uploaded, url will look like:
+	    	//https://s3-us-west-1.amazonaws.com/testtesttestcahlan/5500a3c7b019154d5b1d0418.JPG
+	        if (perr) {
+	            console.log("Error uploading data: ", perr);
+	        } else {
+	            console.log("Successfully uploaded data to myBucket/myKey");
+	        }
+	        User.findOneAndUpdate({_id: req.params.id}, {
+	        	profile_picture: amazon_filename
+	        }, function(err) {
+				return res.status(200).end();
+	        });
+	    });
+	});
+	//if you want to upload locally (to your server)
+	// fs.rename(photo.path, './public/user-profile-images/'+req.params.id+'.'+photo.extension, function() {
+	// 	return res.status(200).end();
+	// });
 });
 
 app.listen(8081);

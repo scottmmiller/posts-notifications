@@ -3,6 +3,7 @@ var mongoose = require('mongoose');
 var schema = new mongoose.Schema({
 	//username, email, password, etc.
 	username: {type: String},
+	profile_picture: {type: String},
 	notifications: [{
 		body: {type: String},
 		createAt: {type: Date, default: Date.now},
