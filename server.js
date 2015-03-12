@@ -156,7 +156,7 @@ app.post('/users/:id/photo', function(req, res) {
 	    };
 	    s3bucket.putObject(params, function (perr, pres) {
 	    	//once uploaded, url will look like:
-	    	//https://s3-us-west-1.amazonaws.com/testtesttestcahlan/5500a3c7b019154d5b1d0418.JPG
+	    	//https://s3-us-west-1.amazonaws.com/posts-notifs/5500a3c7b019154d5b1d0418.JPG
 	        if (perr) {
 	            console.log("Error uploading data: ", perr);
 	        } else {
